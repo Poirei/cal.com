@@ -2,11 +2,13 @@
 
 import Link from "next/link";
 
-import Shell from "@calcom/features/shell/Shell";
+import { AppCard } from "@calcom/features/apps/components/AppCard";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
-import { AppCard, SkeletonText } from "@calcom/ui";
+import { SkeletonText } from "@calcom/ui/components/skeleton";
 
 import type { CategoryDataProps } from "@lib/apps/categories/[category]/getStaticProps";
+
+import Shell from "~/shell/Shell";
 
 export default function Apps({ apps, category }: CategoryDataProps) {
   const { t, isLocaleReady } = useLocale();
@@ -15,7 +17,6 @@ export default function Apps({ apps, category }: CategoryDataProps) {
     <>
       <Shell
         isPublic
-        withoutSeo
         backPath="/apps"
         title={t("app_store")}
         description={t("app_store_description")}

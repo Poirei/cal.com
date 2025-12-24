@@ -4,17 +4,32 @@ import { useState } from "react";
 import { useForm } from "react-hook-form";
 
 import { useLocale } from "@calcom/lib/hooks/useLocale";
-import { trpc } from "@calcom/trpc";
-import { Form, Button, Icon, TextField, showToast, Tooltip, ImageUploader, Avatar } from "@calcom/ui";
+import { trpc } from "@calcom/trpc/react";
+import { Avatar } from "@calcom/ui/components/avatar";
+import { Button } from "@calcom/ui/components/button";
+import { Form } from "@calcom/ui/components/form";
+import { Label } from "@calcom/ui/components/form";
+import { Switch } from "@calcom/ui/components/form";
+import { TextField } from "@calcom/ui/components/form";
+import { Icon } from "@calcom/ui/components/icon";
+import { ImageUploader } from "@calcom/ui/components/image-uploader";
+import { showToast } from "@calcom/ui/components/toast";
+import { Tooltip } from "@calcom/ui/components/tooltip";
 
 type FormValues = {
   name: string;
   redirectUri: string;
   logo: string;
+  enablePkce: boolean;
 };
 
 export default function OAuthView() {
-  const oAuthForm = useForm<FormValues>();
+  const oAuthForm = useForm<FormValues>({
+    defaultValues: {
+      logo: "",
+      enablePkce: false,
+    },
+  });
   const [clientSecret, setClientSecret] = useState("");
   const [clientId, setClientId] = useState("");
   const [logo, setLogo] = useState("");
@@ -22,12 +37,12 @@ export default function OAuthView() {
 
   const mutation = trpc.viewer.oAuth.addClient.useMutation({
     onSuccess: async (data) => {
-      setClientSecret(data.clientSecret);
+      setClientSecret(data.clientSecret || "");
       setClientId(data.clientId);
       showToast(`Successfully added ${data.name} as new client`, "success");
     },
     onError: (error) => {
-      showToast(`Adding clientfailed: ${error.message}`, "error");
+      showToast(`Adding client failed: ${error.message}`, "error");
     },
   });
 
@@ -41,6 +56,7 @@ export default function OAuthView() {
               name: values.name,
               redirectUri: values.redirectUri,
               logo: values.logo,
+              enablePkce: values.enablePkce,
             });
           }}>
           <div className="">
@@ -61,6 +77,20 @@ export default function OAuthView() {
               placeholder=""
               required
             />
+
+            <div className="mb-5 mt-5">
+              <Label className="text-emphasis mb-2 block text-sm font-medium">Authentication Mode</Label>
+              <div className="flex items-center space-x-3">
+                <Switch 
+                  checked={oAuthForm.watch("enablePkce")}
+                  onCheckedChange={(checked) => oAuthForm.setValue("enablePkce", checked)}
+                />
+                <span className="text-default text-sm">
+                  Use PKCE (recommended for mobile/SPA applications)
+                </span>
+              </div>
+            </div>
+
             <div className="mb-5 mt-5 flex items-center">
               <Avatar
                 alt=""
@@ -88,17 +118,16 @@ export default function OAuthView() {
       ) : (
         <div>
           <div className="text-emphasis mb-5 text-xl font-semibold">{oAuthForm.getValues("name")}</div>
-          <div className="mb-2 font-medium">Client Id</div>
+          <div className="mb-2 font-medium">{t("client_id")}</div>
           <div className="flex">
             <code className="bg-subtle text-default w-full truncate rounded-md rounded-r-none py-[6px] pl-2 pr-2 align-middle font-mono">
-              {" "}
               {clientId}
             </code>
             <Tooltip side="top" content="Copy to Clipboard">
               <Button
                 onClick={() => {
                   navigator.clipboard.writeText(clientId);
-                  showToast("Client ID copied!", "success");
+                  showToast(t("client_id_copied"), "success");
                 }}
                 type="button"
                 className="rounded-l-none text-base"
@@ -109,10 +138,9 @@ export default function OAuthView() {
           </div>
           {clientSecret ? (
             <>
-              <div className="mb-2 mt-4 font-medium">Client Secret</div>
+              <div className="mb-2 mt-4 font-medium">{t("client_secret")}</div>
               <div className="flex">
                 <code className="bg-subtle text-default w-full truncate rounded-md rounded-r-none py-[6px] pl-2 pr-2 align-middle font-mono">
-                  {" "}
                   {clientSecret}
                 </code>
                 <Tooltip side="top" content="Copy to Clipboard">
@@ -120,7 +148,7 @@ export default function OAuthView() {
                     onClick={() => {
                       navigator.clipboard.writeText(clientSecret);
                       setClientSecret("");
-                      showToast("Client secret copied!", "success");
+                      showToast(t("client_secret_copied"), "success");
                     }}
                     type="button"
                     className="rounded-l-none text-base"
@@ -132,7 +160,9 @@ export default function OAuthView() {
               <div className="text-subtle text-sm">{t("copy_client_secret_info")}</div>
             </>
           ) : (
-            <></>
+            <div className="text-subtle mt-4 text-sm">
+              This client uses PKCE authentication (no client secret required).
+            </div>
           )}
           <Button
             onClick={() => {

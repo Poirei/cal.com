@@ -28,7 +28,7 @@ const IS_EMBED_REACT_TEST = process.argv.some((a) => a.startsWith("--project=@ca
 const webServer: PlaywrightTestConfig["webServer"] = [
   {
     command:
-      "NEXT_PUBLIC_IS_E2E=1 NODE_OPTIONS='--dns-result-order=ipv4first' yarn workspace @calcom/web start -p 3000",
+      "yarn workspace @calcom/web copy-app-store-static && NEXT_PUBLIC_IS_E2E=1 NODE_OPTIONS='--dns-result-order=ipv4first' yarn workspace @calcom/web start -p 3000",
     port: 3000,
     timeout: 60_000,
     reuseExistingServer: !process.env.CI,
@@ -170,6 +170,15 @@ const config: PlaywrightTestConfig = {
         timeout: DEFAULT_EXPECT_TIMEOUT,
       },
       use: { ...devices["Desktop Safari"] },
+    },
+    {
+      name: "@calcom/embed-core--isMobile",
+      testDir: "./packages/embeds/embed-core/",
+      testMatch: /.*\.e2e\.tsx?/,
+      expect: {
+        timeout: DEFAULT_EXPECT_TIMEOUT,
+      },
+      use: { ...devices["iPhone 13"] },
     },
   ],
 };
@@ -314,7 +323,7 @@ expect.extend({
 export default config;
 
 function ensureAppServerIsReadyToServeEmbed(webServer: { port?: number; url?: string }) {
-  // We should't depend on an embed dependency for App's tests. So, conditionally modify App webServer.
+  // We shouldn't depend on an embed dependency for App's tests. So, conditionally modify App webServer.
   // Only one of port or url can be specified, so remove port.
   delete webServer.port;
   webServer.url = `${process.env.NEXT_PUBLIC_WEBAPP_URL}/embed/embed.js`;

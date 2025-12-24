@@ -3,6 +3,9 @@ export type RoutingFormSearchParamsForEmbed = {
   teamId?: number;
   eventTypeSlug: string;
   username?: string;
+  crmAppSlug?: string;
+  crmOwnerRecordType?: string;
+  teamMemberEmail?: string;
 } & RoutingFormSearchParams;
 
 export type RoutingFormSearchParams = {
@@ -10,7 +13,9 @@ export type RoutingFormSearchParams = {
   ["cal.reroutingFormResponses"]?: string;
   ["cal.skipContactOwner"]?: string;
   ["cal.isBookingDryRun"]?: string;
-  ["cal.cache"]?: string;
   ["cal.routingFormResponseId"]?: string;
+  ["cal.crmAppSlug"]?: string;
+  ["cal.crmOwnerRecordType"]?: string;
+  ["cal.teamMemberEmail"]?: string;
   ["cal.salesforce.rrSkipToAccountLookupField"]?: string;
 };

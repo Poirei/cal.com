@@ -1,7 +1,11 @@
+import matchers from "@testing-library/jest-dom/matchers";
 import React from "react";
-import { vi, afterEach } from "vitest";
+import ResizeObserver from "resize-observer-polyfill";
+import { vi, afterEach, expect } from "vitest";
 
 global.React = React;
+global.ResizeObserver = ResizeObserver;
+expect.extend(matchers);
 
 afterEach(() => {
   vi.resetAllMocks();
@@ -18,7 +22,7 @@ vi.mock("next/navigation", () => ({
   useRouter: vi.fn().mockReturnValue({
     replace: vi.fn(),
   }),
-  usePathname: vi.fn(),
+  usePathname: vi.fn().mockReturnValue("/settings/billing"),
 }));
 
 vi.mock("@calcom/app-store/BookingPageTagManager", () => ({
@@ -35,7 +39,7 @@ vi.mock("@calcom/app-store/utils", () => ({
   getEventTypeAppData: vi.fn(),
 }));
 
-vi.mock("@calcom/core/event", () => ({
+vi.mock("@calcom/features/eventtypes/lib/eventNaming", () => ({
   getEventName: vi.fn(),
 }));
 
@@ -60,7 +64,7 @@ vi.mock("@calcom/features/bookings/components/event-meta/Price", () => {
   return {};
 });
 
-vi.mock("@calcom/features/bookings/lib/SystemField", () => {
+vi.mock("@calcom/lib/bookings/SystemField", () => {
   return {};
 });
 
@@ -72,7 +76,7 @@ vi.mock("@calcom/lib/constants", () => {
   };
 });
 
-vi.mock("@calcom/lib/date-fns", () => {
+vi.mock("@calcom/lib/dayjs", () => {
   return {};
 });
 
@@ -90,10 +94,8 @@ vi.mock("@calcom/lib/hooks/useCompatSearchParams", () => {
 
 vi.mock("@calcom/lib/hooks/useLocale", () => {
   return {
-    useLocale: vi.fn().mockReturnValue({
-      t: vi.fn().mockImplementation((text: string) => {
-        return text;
-      }),
+    useLocale: () => ({
+      t: (text: string) => text,
       i18n: {
         language: "en",
       },
@@ -128,10 +130,13 @@ vi.mock("@calcom/prisma/zod-utils", () => ({
   EventTypeMetaDataSchema: {
     parse: vi.fn(),
   },
-  eventTypeMetaDataSchemaWithTypedApps: {
+  bookingMetadataSchema: {
     parse: vi.fn(),
   },
-  bookingMetadataSchema: {
+}));
+
+vi.mock("@calcom/app-store/zod-utils", () => ({
+  eventTypeMetaDataSchemaWithTypedApps: {
     parse: vi.fn(),
   },
 }));
@@ -151,12 +156,21 @@ vi.mock("@calcom/trpc/react", () => ({
   },
 }));
 
-vi.mock("@calcom/ui", () => ({
-  HeadSeo: vi.fn(),
+vi.mock("@calcom/ui/styles", () => ({
   useCalcomTheme: vi.fn(),
+}));
+
+vi.mock("@calcom/ui/components/icon", () => ({
   Icon: vi.fn(),
+}));
+
+vi.mock("@calcom/ui/components/unpublished-entity", () => ({
   UnpublishedEntity: vi.fn(),
+}));
+
+vi.mock("@calcom/ui/components/avatar", () => ({
   UserAvatar: vi.fn(),
+  Avatar: () => null,
 }));
 
 vi.mock("@calcom/web/components/PageWrapper", () => ({

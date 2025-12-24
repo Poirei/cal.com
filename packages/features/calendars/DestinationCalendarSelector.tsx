@@ -6,7 +6,9 @@ import { components } from "react-select";
 import type { SelectClassNames } from "@calcom/features/eventtypes/lib/types";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import type { RouterOutputs } from "@calcom/trpc/react";
-import { Badge, Icon, Select } from "@calcom/ui";
+import { Badge } from "@calcom/ui/components/badge";
+import { Select } from "@calcom/ui/components/form";
+import { Icon } from "@calcom/ui/components/icon";
 
 interface Props {
   onChange: (value: { externalId: string; integration: string }) => void;
@@ -16,7 +18,7 @@ interface Props {
   value: string | undefined;
   maxWidth?: number;
   hideAdvancedText?: boolean;
-  calendarsQueryData?: RouterOutputs["viewer"]["connectedCalendars"];
+  calendarsQueryData?: RouterOutputs["viewer"]["calendars"]["connectedCalendars"];
   customClassNames?: SelectClassNames;
 }
 
@@ -97,7 +99,7 @@ const DestinationCalendarSelector = ({
 
       setSelectedOption({
         value: `${selected.integration}:${selected.externalId}`,
-        label: `${selected.name} ` || "",
+        label: selected.name ? `${selected.name} ` : "",
         subtitle: `(${selectedIntegration?.integration.title?.replace(/calendar/i, "")} - ${
           selectedIntegration?.primary?.name
         })`,
@@ -146,17 +148,16 @@ const DestinationCalendarSelector = ({
         }
         options={options}
         styles={{
-          placeholder: (styles) => ({ ...styles, ...content(hidePlaceholder) }),
-          singleValue: (styles) => ({ ...styles, ...content(hidePlaceholder) }),
-          control: (defaultStyles) => {
-            return {
-              ...defaultStyles,
-              "@media only screen and (min-width: 640px)": {
-                ...(defaultStyles["@media only screen and (min-width: 640px)"] as object),
-                maxWidth,
-              },
-            };
-          },
+          placeholder: (styles) => Object.assign({}, styles, content(hidePlaceholder)),
+          singleValue: (styles) => Object.assign({}, styles, content(hidePlaceholder)),
+          control: (defaultStyles) =>
+            Object.assign({}, defaultStyles, {
+              "@media only screen and (min-width: 640px)": Object.assign(
+                {},
+                defaultStyles["@media only screen and (min-width: 640px)"] as object,
+                { maxWidth }
+              ),
+            }),
         }}
         isSearchable={false}
         className={classNames(

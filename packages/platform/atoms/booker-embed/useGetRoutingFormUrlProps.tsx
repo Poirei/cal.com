@@ -71,15 +71,21 @@ export const useGetRoutingFormUrlProps = ({ routingFormUrl }: { routingFormUrl?:
         ...(routingSearchParams.get("cal.isBookingDryRun") && {
           ["cal.isBookingDryRun"]: routingSearchParams.get("cal.isBookingDryRun") ?? undefined,
         }),
-        ...(routingSearchParams.get("cal.cache") && {
-          ["cal.cache"]: routingSearchParams.get("cal.cache") ?? undefined,
-        }),
         ...(routingSearchParams.get("cal.routingFormResponseId") && {
           ["cal.routingFormResponseId"]: routingSearchParams.get("cal.routingFormResponseId") ?? undefined,
         }),
         ...(routingSearchParams.get("cal.salesforce.rrSkipToAccountLookupField") && {
           ["cal.salesforce.rrSkipToAccountLookupField"]:
             routingSearchParams.get("cal.salesforce.rrSkipToAccountLookupField") ?? undefined,
+        }),
+        ...(routingSearchParams.get("cal.teamMemberEmail") && {
+          teamMemberEmail: routingSearchParams.get("cal.teamMemberEmail") ?? undefined,
+        }),
+        ...(routingSearchParams.get("cal.crmOwnerRecordType") && {
+          crmOwnerRecordType: routingSearchParams.get("cal.crmOwnerRecordType") ?? undefined,
+        }),
+        ...(routingSearchParams.get("cal.crmAppSlug") && {
+          crmAppSlug: routingSearchParams.get("cal.crmAppSlug") ?? undefined,
         }),
       } satisfies RoutingFormSearchParamsForEmbed;
       return { ...routingformProps, defaultFormValues };

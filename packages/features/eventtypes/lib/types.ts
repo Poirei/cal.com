@@ -1,16 +1,18 @@
-import type { z } from "zod";
+import { z } from "zod";
 
-import type { EventLocationType } from "@calcom/core/location";
-import type { ChildrenEventType } from "@calcom/features/eventtypes/components/ChildrenEventTypeSelect";
+import type { EventLocationType } from "@calcom/app-store/locations";
+import type { eventTypeMetaDataSchemaWithTypedApps } from "@calcom/app-store/zod-utils";
+import type { ChildrenEventType } from "@calcom/features/eventtypes/lib/childrenEventType";
+import type { IntervalLimit } from "@calcom/lib/intervalLimits/intervalLimitSchema";
 import type { AttributesQueryValue } from "@calcom/lib/raqb/types";
 import type { EventTypeTranslation } from "@calcom/prisma/client";
-import type { PeriodType, SchedulingType } from "@calcom/prisma/enums";
-import type { BookerLayoutSettings, eventTypeMetaDataSchemaWithTypedApps } from "@calcom/prisma/zod-utils";
+import { type PeriodType, SchedulingType } from "@calcom/prisma/enums";
+import type { BookerLayoutSettings } from "@calcom/prisma/zod-utils";
 import type { customInputSchema } from "@calcom/prisma/zod-utils";
 import type { eventTypeBookingFields } from "@calcom/prisma/zod-utils";
 import type { eventTypeColor } from "@calcom/prisma/zod-utils";
 import type { RouterOutputs, RouterInputs } from "@calcom/trpc/react";
-import type { IntervalLimit, RecurringEvent } from "@calcom/types/Calendar";
+import type { RecurringEvent } from "@calcom/types/Calendar";
 
 export type CustomInputParsed = typeof customInputSchema._output;
 
@@ -22,13 +24,14 @@ export type AvailabilityOption = {
 };
 export type EventTypeSetupProps = RouterOutputs["viewer"]["eventTypes"]["get"];
 export type EventTypeSetup = RouterOutputs["viewer"]["eventTypes"]["get"]["eventType"];
-export type EventTypeApps = RouterOutputs["viewer"]["integrations"];
+export type EventTypeApps = RouterOutputs["viewer"]["apps"]["integrations"];
 export type Host = {
   isFixed: boolean;
   userId: number;
   priority: number;
   weight: number;
   scheduleId?: number | null;
+  groupId: string | null;
 };
 export type TeamMember = {
   value: string;
@@ -50,6 +53,7 @@ type EventLocation = {
   hostDefault?: string;
   credentialId?: number;
   teamName?: string;
+  customLabel?: string;
 };
 
 type PhoneCallConfig = {
@@ -65,12 +69,20 @@ type PhoneCallConfig = {
   schedulerName?: string;
 };
 
+export type PrivateLinkWithOptions = {
+  link: string;
+  expiresAt?: Date | null;
+  maxUsageCount?: number | null;
+  usageCount?: number;
+};
+
 export type FormValues = {
   id: number;
   title: string;
   eventTitle: string;
   eventName: string;
   slug: string;
+  interfaceLanguage: string | null;
   isInstantEvent: boolean;
   instantMeetingParameters: string[];
   instantMeetingExpiryTimeOffsetInSeconds: number;
@@ -79,6 +91,7 @@ export type FormValues = {
   description: string;
   disableGuests: boolean;
   lockTimeZoneToggleOnBookingPage: boolean;
+  lockedTimeZone: string | null;
   requiresConfirmation: boolean;
   requiresConfirmationWillBlockSlot: boolean;
   requiresConfirmationForFreeEmail: boolean;
@@ -87,14 +100,17 @@ export type FormValues = {
   schedulingType: SchedulingType | null;
   hidden: boolean;
   hideCalendarNotes: boolean;
-  multiplePrivateLinks: string[] | undefined;
+  multiplePrivateLinks: (string | PrivateLinkWithOptions)[] | undefined;
   eventTypeColor: z.infer<typeof eventTypeColor>;
+  customReplyToEmail: string | null;
   locations: EventLocation[];
   aiPhoneCallConfig: PhoneCallConfig;
   customInputs: CustomInputParsed[];
   schedule: number | null;
   useEventLevelSelectedCalendars: boolean;
-
+  disabledCancelling: boolean;
+  disabledRescheduling: boolean;
+  minimumRescheduleNotice: number | null;
   periodType: PeriodType;
   /**
    * Number of days(Applicable only for ROLLING period type)
@@ -115,10 +131,12 @@ export type FormValues = {
   seatsShowAvailabilityCount: boolean | null;
   seatsPerTimeSlotEnabled: boolean;
   autoTranslateDescriptionEnabled: boolean;
+  autoTranslateInstantMeetingTitleEnabled: boolean;
   fieldTranslations: EventTypeTranslation[];
   scheduleName: string;
   minimumBookingNotice: number;
   minimumBookingNoticeInDurationType: number;
+  maxActiveBookingsPerBooker: number | null;
   beforeEventBuffer: number;
   afterEventBuffer: number;
   slotInterval: number | null;
@@ -131,8 +149,13 @@ export type FormValues = {
   durationLimits?: IntervalLimit;
   bookingLimits?: IntervalLimit;
   onlyShowFirstAvailableSlot: boolean;
+  showOptimizedSlots: boolean;
   children: ChildrenEventType[];
   hosts: Host[];
+  hostGroups: {
+    id: string;
+    name: string;
+  }[];
   bookingFields: z.infer<typeof eventTypeBookingFields>;
   availability?: AvailabilityOption;
   bookerLayouts: BookerLayoutSettings;
@@ -147,13 +170,18 @@ export type FormValues = {
   secondaryEmailId?: number;
   isRRWeightsEnabled: boolean;
   maxLeadThreshold?: number;
+  restrictionScheduleId: number | null;
+  useBookerTimezone: boolean;
+  restrictionScheduleName: string | null;
+  calVideoSettings?: CalVideoSettings;
+  maxActiveBookingPerBookerOfferReschedule: boolean;
 };
 
 export type LocationFormValues = Pick<FormValues, "id" | "locations" | "bookingFields" | "seatsPerTimeSlot">;
 
 export type EventTypeAssignedUsers = RouterOutputs["viewer"]["eventTypes"]["get"]["eventType"]["children"];
 export type EventTypeHosts = RouterOutputs["viewer"]["eventTypes"]["get"]["eventType"]["hosts"];
-export type EventTypeUpdateInput = RouterInputs["viewer"]["eventTypes"]["update"];
+export type EventTypeUpdateInput = RouterInputs["viewer"]["eventTypesHeavy"]["update"];
 export type TabMap = {
   advanced: React.ReactNode;
   ai?: React.ReactNode;
@@ -202,3 +230,27 @@ export type SelectClassNames = {
   label?: string;
   container?: string;
 };
+
+// Re-export schemas from server-safe location
+export { EventTypeDuplicateInput, createEventTypeInput } from "./schemas";
+
+export type FormValidationResult = {
+  isValid: boolean;
+  errors: Record<string, unknown>;
+};
+
+export interface EventTypePlatformWrapperRef {
+  validateForm: () => Promise<FormValidationResult>;
+  handleFormSubmit: (callbacks?: { onSuccess?: () => void; onError?: (error: Error) => void }) => void;
+}
+
+export interface CalVideoSettings {
+  disableRecordingForOrganizer?: boolean;
+  disableRecordingForGuests?: boolean;
+  enableAutomaticTranscription?: boolean;
+  enableAutomaticRecordingForOrganizer?: boolean;
+  disableTranscriptionForGuests?: boolean;
+  disableTranscriptionForOrganizer?: boolean;
+  redirectUrlOnExit?: string;
+  requireEmailForGuests?: boolean;
+}

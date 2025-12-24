@@ -5,7 +5,7 @@ import Link from "next/link";
 import { IS_PRODUCTION } from "@calcom/lib/constants";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
 import { markdownToSafeHTML } from "@calcom/lib/markdownToSafeHTML";
-import { showToast } from "@calcom/ui";
+import { showToast } from "@calcom/ui/components/toast";
 
 import type { AppDataProps } from "@lib/apps/[slug]/getStaticProps";
 import useRouterQuery from "@lib/hooks/useRouterQuery";
@@ -15,7 +15,7 @@ import App from "@components/apps/App";
 function SingleAppPage(props: AppDataProps) {
   const { error, setQuery: setError } = useRouterQuery("error");
   const { t } = useLocale();
-  if (error === "account_already_linked") {
+  if (error === "account_already_linked" || error === "no_default_calendar") {
     showToast(t(error), "error", { id: error });
     setError(undefined);
   }
@@ -66,7 +66,7 @@ function SingleAppPage(props: AppDataProps) {
       //   privacy="https://zoom.us/privacy"
       body={
         <>
-          {/* eslint-disable-next-line react/no-danger */}
+          { }
           <div dangerouslySetInnerHTML={{ __html: markdownToSafeHTML(source.content) }} />
         </>
       }

@@ -1,70 +1,87 @@
 "use client";
 
 import { type Table } from "@tanstack/react-table";
-// eslint-disable-next-line no-restricted-imports
 import startCase from "lodash/startCase";
-import { forwardRef, useCallback } from "react";
+import { forwardRef, useState } from "react";
 
 import { useLocale } from "@calcom/lib/hooks/useLocale";
-import {
-  Button,
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-  Command,
-  CommandInput,
-  CommandList,
-  CommandEmpty,
-  CommandItem,
-  Icon,
-} from "@calcom/ui";
+import { Button } from "@calcom/ui/components/button";
+import { Command, CommandInput, CommandList, CommandEmpty, CommandItem } from "@calcom/ui/components/command";
+import { Icon } from "@calcom/ui/components/icon";
+import { Popover, PopoverTrigger, PopoverContent } from "@calcom/ui/components/popover";
+import { Tooltip } from "@calcom/ui/components/tooltip";
 
 import { useDataTable, useFilterableColumns } from "../../hooks";
 
 export interface AddFilterButtonProps<TData> {
   table: Table<TData>;
+  variant?: "base" | "minimal";
 }
 
 function AddFilterButtonComponent<TData>(
-  { table }: AddFilterButtonProps<TData>,
+  { table, variant = "base" }: AddFilterButtonProps<TData>,
   ref: React.Ref<HTMLButtonElement>
 ) {
   const { t } = useLocale();
-  const { activeFilters, setActiveFilters } = useDataTable();
+  const { activeFilters, addFilter, filterToOpen } = useDataTable();
+  const [open, setOpen] = useState(false);
 
   const filterableColumns = useFilterableColumns(table);
-
-  const handleAddFilter = useCallback(
-    (columnId: string) => {
-      if (!activeFilters?.some((filter) => filter.f === columnId)) {
-        setActiveFilters([...activeFilters, { f: columnId, v: undefined }]);
-      }
-    },
-    [activeFilters, setActiveFilters]
+  const availableColumns = filterableColumns.filter(
+    (column) => !activeFilters?.some((filter) => filter.f === column.id)
   );
+
+  if (variant === "minimal" && availableColumns.length === 0) {
+    return null;
+  }
 
   return (
     <div className="flex items-center space-x-2">
-      <Popover>
-        <PopoverTrigger asChild>
-          <Button ref={ref} color="secondary" data-testid="add-filter-button">
-            <Icon name="sliders-horizontal" className="mr-2 h-4 w-4" />
-            {t("filter")}
-          </Button>
-        </PopoverTrigger>
+      <Popover open={open} onOpenChange={setOpen}>
+        {variant === "base" && (
+          <PopoverTrigger asChild>
+            <Button
+              ref={ref}
+              color="secondary"
+              data-testid="add-filter-button"
+              StartIcon="list-filter"
+              className="h-full">
+              {t("filter")}
+            </Button>
+          </PopoverTrigger>
+        )}
+        {variant === "minimal" && (
+          <Tooltip content={t("add_filter")}>
+            <PopoverTrigger asChild>
+              <Button ref={ref} color="secondary" data-testid="add-filter-button" className="h-full">
+                <span className="sr-only">{t("filter")}</span>
+                <Icon name="plus" />
+              </Button>
+            </PopoverTrigger>
+          </Tooltip>
+        )}
         <PopoverContent className="w-[200px] p-0" align="start">
           <Command>
             <CommandInput placeholder={t("search")} />
             <CommandList>
               <CommandEmpty>{t("no_columns_found")}</CommandEmpty>
-              {filterableColumns.map((column) => {
-                if (activeFilters?.some((filter) => filter.f === column.id)) return null;
+              {availableColumns.map((column) => {
+                const showHiddenIndicator =
+                  !table.getColumn(column.id)?.getIsVisible() &&
+                  table.initialState.columnVisibility?.[column.id] !== false;
+
                 return (
                   <CommandItem
                     key={column.id}
-                    onSelect={() => handleAddFilter(column.id)}
-                    className="px-4 py-2">
-                    {startCase(column.title)}
+                    onSelect={() => {
+                      if (filterToOpen) filterToOpen.current = column.id;
+                      addFilter(column.id);
+                      setOpen(false);
+                    }}
+                    className="flex items-center justify-between rounded-none px-4 py-2"
+                    data-testid={`add-filter-item-${column.id}`}>
+                    <span>{startCase(column.title)}</span>
+                    {showHiddenIndicator && <Icon name="eye-off" className="h-4 w-4 opacity-50" />}
                   </CommandItem>
                 );
               })}

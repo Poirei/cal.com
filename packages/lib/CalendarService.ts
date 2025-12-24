@@ -1,6 +1,5 @@
 /* eslint-disable @typescript-eslint/triple-slash-reference */
 /// <reference path="../types/ical.d.ts"/>
-import type { Prisma } from "@prisma/client";
 import ICAL from "ical.js";
 import type { Attendee, DateArray, DurationObject } from "ics";
 import { createEvent } from "ics";
@@ -21,6 +20,7 @@ import sanitizeCalendarObject from "@calcom/lib/sanitizeCalendarObject";
 import type { Person as AttendeeInCalendarEvent } from "@calcom/types/Calendar";
 import type {
   Calendar,
+  CalendarServiceEvent,
   CalendarEvent,
   CalendarEventType,
   EventBusyDate,
@@ -139,10 +139,9 @@ export default abstract class BaseCalendarService implements Calendar {
     return attendees;
   }
 
-  async createEvent(event: CalendarEvent, credentialId: number): Promise<NewCalendarEventType> {
+  async createEvent(event: CalendarServiceEvent, credentialId: number): Promise<NewCalendarEventType> {
     try {
       const calendars = await this.listCalendars(event);
-
       const uid = uuidv4();
 
       // We create local ICS files
@@ -152,7 +151,7 @@ export default abstract class BaseCalendarService implements Calendar {
         start: convertDate(event.startTime),
         duration: getDuration(event.startTime, event.endTime),
         title: event.title,
-        description: getRichDescription(event),
+        description: event.calendarDescription,
         location: getLocation(event),
         organizer: { email: event.organizer.email, name: event.organizer.name },
         attendees: this.getAttendees(event),
@@ -353,7 +352,7 @@ export default abstract class BaseCalendarService implements Calendar {
     const allowedExtensions = ["eml", "ics"];
     const urlExtension = getFileExtension(url);
     if (!allowedExtensions.includes(urlExtension)) {
-      console.error(`Unsupported calendar object format: ${urlExtension}`);
+      logger.error(`Unsupported calendar object format: ${urlExtension}`);
       return false;
     }
     return true;
@@ -384,7 +383,7 @@ export default abstract class BaseCalendarService implements Calendar {
         const jcalData = ICAL.parse(sanitizeCalendarObject(object));
         vcalendar = new ICAL.Component(jcalData);
       } catch (e) {
-        console.error("Error parsing calendar object: ", e);
+        logger.error("Error parsing calendar object: ", e);
         return;
       }
       const vevents = vcalendar.getAllSubcomponents("vevent");
@@ -393,11 +392,16 @@ export default abstract class BaseCalendarService implements Calendar {
         if (vevent?.getFirstPropertyValue("transp") === "TRANSPARENT") return;
 
         const event = new ICAL.Event(vevent);
+        const dtstartProperty = vevent.getFirstProperty("dtstart");
+        const tzidFromDtstart = dtstartProperty ? (dtstartProperty as any).jCal[1].tzid : undefined;
         const dtstart: { [key: string]: string } | undefined = vevent?.getFirstPropertyValue("dtstart");
         const timezone = dtstart ? dtstart["timezone"] : undefined;
         // We check if the dtstart timezone is in UTC which is actually represented by Z instead, but not recognized as that in ICAL.js as UTC
         const isUTC = timezone === "Z";
-        const tzid: string | undefined = vevent?.getFirstPropertyValue("tzid") || isUTC ? "UTC" : timezone;
+
+        // Fix precedence: prioritize TZID from DTSTART property, then standalone TZID, then UTC, then fallback
+        const tzid: string | undefined =
+          tzidFromDtstart || vevent?.getFirstPropertyValue("tzid") || (isUTC ? "UTC" : timezone);
         // In case of icalendar, when only tzid is available without vtimezone, we need to add vtimezone explicitly to take care of timezone diff
         if (!vcalendar.getFirstSubcomponent("vtimezone")) {
           const timezoneToUse = tzid || userTimeZone;
@@ -420,13 +424,22 @@ export default abstract class BaseCalendarService implements Calendar {
               vcalendar.addSubcomponent(timezoneComp);
             } catch (e) {
               // Adds try-catch to ensure the code proceeds when Apple Calendar provides non-standard TZIDs
-              console.log("error in adding vtimezone", e);
+              logger.warn("error in adding vtimezone", e);
             }
           } else {
-            console.error("No timezone found");
+            logger.warn("No timezone found");
           }
         }
-        const vtimezone = vcalendar.getFirstSubcomponent("vtimezone");
+
+        let vtimezone = null;
+        if (tzid) {
+          const allVtimezones = vcalendar.getAllSubcomponents("vtimezone");
+          vtimezone = allVtimezones.find((vtz) => vtz.getFirstPropertyValue("tzid") === tzid);
+        }
+
+        if (!vtimezone) {
+          vtimezone = vcalendar.getFirstSubcomponent("vtimezone");
+        }
 
         // mutate event to consider travel time
         applyTravelDuration(event, getTravelDurationInSeconds(vevent, this.log));
@@ -434,7 +447,7 @@ export default abstract class BaseCalendarService implements Calendar {
         if (event.isRecurring()) {
           let maxIterations = 365;
           if (["HOURLY", "SECONDLY", "MINUTELY"].includes(event.getRecurrenceTypes())) {
-            console.error(`Won't handle [${event.getRecurrenceTypes()}] recurrence`);
+            logger.warn(`Won't handle [${event.getRecurrenceTypes()}] recurrence`);
             return;
           }
 
@@ -487,7 +500,7 @@ export default abstract class BaseCalendarService implements Calendar {
             }
           }
           if (maxIterations <= 0) {
-            console.warn("could not find any occurrence for recurring event in 365 iterations");
+            logger.warn("Could not find any occurrence for recurring event in 365 iterations");
           }
           return;
         }
@@ -498,9 +511,11 @@ export default abstract class BaseCalendarService implements Calendar {
           event.endDate = event.endDate.convertToZone(zone);
         }
 
+        const finalStartISO = dayjs(event.startDate.toJSDate()).toISOString();
+        const finalEndISO = dayjs(event.endDate.toJSDate()).toISOString();
         return events.push({
-          start: dayjs(event.startDate.toJSDate()).toISOString(),
-          end: dayjs(event.endDate.toJSDate()).toISOString(),
+          start: finalStartISO,
+          end: finalEndISO,
         });
       });
     });
@@ -685,13 +700,14 @@ export default abstract class BaseCalendarService implements Calendar {
         });
       return events;
     } catch (reason) {
-      console.error(reason);
+      logger.error(reason);
       throw reason;
     }
   }
 
   private async getEventsByUID(uid: string): Promise<CalendarEventType[]> {
-    const events: Prisma.PromiseReturnType<typeof this.getEvents> = [];
+    type EventsType = Awaited<ReturnType<typeof this.getEvents>>;
+    const events: EventsType = [];
     const calendars = await this.listCalendars();
 
     for (const cal of calendars) {

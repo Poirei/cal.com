@@ -1,48 +1,154 @@
 "use client";
 
+import { usePathname } from "next/navigation";
+import { useState, useCallback } from "react";
+
+import {
+  DataTableProvider,
+  DataTableFilters,
+  DateRangeFilter,
+  ColumnFilterType,
+  type FilterableColumn,
+} from "@calcom/features/data-table";
+import type { FilterType } from "@calcom/types/data-table";
+import { useDataTable } from "@calcom/features/data-table/hooks/useDataTable";
+import { useSegments } from "@calcom/features/data-table/hooks/useSegments";
 import {
   AverageEventDurationChart,
   BookingKPICards,
-  BookingStatusLineChart,
-  LeastBookedTeamMembersTable,
-  MostBookedTeamMembersTable,
-  PopularEventsTable,
+  BookingsByHourChart,
+  CSATOverTimeChart,
+  EventTrendsChart,
   HighestNoShowHostTable,
-  RecentFeedbackTable,
   HighestRatedMembersTable,
+  LeastBookedTeamMembersTable,
   LowestRatedMembersTable,
-} from "@calcom/features/insights/components";
-import { FiltersProvider } from "@calcom/features/insights/context/FiltersProvider";
-import { Filters } from "@calcom/features/insights/filters";
+  MostBookedTeamMembersTable,
+  MostCancelledBookingsTables,
+  MostCompletedTeamMembersTable,
+  LeastCompletedTeamMembersTable,
+  NoShowHostsOverTimeChart,
+  PopularEventsTable,
+  RecentNoShowGuestsChart,
+  RecentFeedbackTable,
+  TimezoneBadge,
+} from "@calcom/features/insights/components/booking";
+import { InsightsOrgTeamsProvider } from "@calcom/features/insights/context/InsightsOrgTeamsProvider";
+import { DateTargetSelector, type DateTarget } from "@calcom/features/insights/filters/DateTargetSelector";
+import { Download } from "@calcom/features/insights/filters/Download";
+import { OrgTeamsFilter } from "@calcom/features/insights/filters/OrgTeamsFilter";
+import { useInsightsBookings } from "@calcom/features/insights/hooks/useInsightsBookings";
+import { useInsightsOrgTeams } from "@calcom/features/insights/hooks/useInsightsOrgTeams";
 import { useLocale } from "@calcom/lib/hooks/useLocale";
+import { ButtonGroup } from "@calcom/ui/components/buttonGroup";
 
-export default function InsightsPage() {
+export default function InsightsPage({ timeZone }: { timeZone: string }) {
+  const pathname = usePathname();
+  if (!pathname) return null;
+  return (
+    <DataTableProvider tableIdentifier={pathname} useSegments={useSegments} timeZone={timeZone}>
+      <InsightsOrgTeamsProvider>
+        <InsightsPageContent />
+      </InsightsOrgTeamsProvider>
+    </DataTableProvider>
+  );
+}
+
+const createdAtColumn: Extract<FilterableColumn, { type: Extract<FilterType, "dr"> }> = {
+  id: "createdAt",
+  title: "createdAt",
+  type: ColumnFilterType.DATE_RANGE,
+};
+
+const startTimeColumn: Extract<FilterableColumn, { type: Extract<FilterType, "dr"> }> = {
+  id: "startTime",
+  title: "startTime",
+  type: ColumnFilterType.DATE_RANGE,
+};
+
+function InsightsPageContent() {
   const { t } = useLocale();
+  const { table } = useInsightsBookings();
+  const { isAll, teamId, userId } = useInsightsOrgTeams();
+  const { removeFilter } = useDataTable();
+  const [dateTarget, _setDateTarget] = useState<"startTime" | "createdAt">("startTime");
+
+  const setDateTarget = useCallback(
+    (target: "startTime" | "createdAt") => {
+      _setDateTarget(target);
+      removeFilter(target === "startTime" ? "createdAt" : "startTime");
+    },
+    [_setDateTarget, removeFilter]
+  );
 
   return (
-    <FiltersProvider>
-      <Filters />
+    <>
+      <div
+        className="flex flex-wrap items-center gap-2"
+        data-testid={`insights-filters-${isAll}-${teamId}-${userId}`}>
+        <OrgTeamsFilter />
+        <DataTableFilters.FilterBar table={table} />
+        <DataTableFilters.ClearFiltersButton exclude={["startTime", "createdAt"]} />
+        <div className="grow" />
+        <Download />
+        <ButtonGroup combined>
+          <DateRangeFilter
+            column={dateTarget === "startTime" ? startTimeColumn : createdAtColumn}
+            options={{ convertToTimeZone: true }}
+          />
+          <DateTargetSelector value={dateTarget as DateTarget} onChange={setDateTarget} />
+        </ButtonGroup>
+        <TimezoneBadge />
+      </div>
 
-      <div className="mb-4 space-y-4">
+      <div className="my-4 stack-y-4">
         <BookingKPICards />
 
-        <BookingStatusLineChart />
+        <EventTrendsChart />
 
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <PopularEventsTable />
-
-          <AverageEventDurationChart />
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+          <NoShowHostsOverTimeChart />
+          <CSATOverTimeChart />
         </div>
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+          <div className="sm:col-span-2">
+            <BookingsByHourChart />
+          </div>
+          <div className="sm:col-span-2">
+            <AverageEventDurationChart />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
           <MostBookedTeamMembersTable />
           <LeastBookedTeamMembersTable />
+          <MostCompletedTeamMembersTable />
+          <LeastCompletedTeamMembersTable />
         </div>
-        <RecentFeedbackTable />
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+          <MostCancelledBookingsTables />
           <HighestNoShowHostTable />
+          <div className="sm:col-span-2">
+            <RecentNoShowGuestsChart />
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
           <HighestRatedMembersTable />
           <LowestRatedMembersTable />
+          <div className="sm:col-span-2">
+            <RecentFeedbackTable />
+          </div>
         </div>
+
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:grid-cols-4">
+          <div className="sm:col-span-2">
+            <PopularEventsTable />
+          </div>
+        </div>
+
         <small className="text-default block text-center">
           {t("looking_for_more_insights")}{" "}
           <a
@@ -53,6 +159,6 @@ export default function InsightsPage() {
           </a>
         </small>
       </div>
-    </FiltersProvider>
+    </>
   );
 }
